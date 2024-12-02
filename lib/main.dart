@@ -10,6 +10,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(debugShowCheckedModeBanner: false, home: Home());
+    return MaterialApp(
+      theme: ThemeData(fontFamily: 'Backwards'),
+      debugShowCheckedModeBanner: false,
+      home: const Home(),
+    );
   }
 }
