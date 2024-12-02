@@ -3,7 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:notesapp/services/database_services.dart';
 
 class Home extends StatefulWidget {
-  const Home({super.key});
+  final int userId;
+  const Home({super.key, required this.userId});
 
   @override
   State<Home> createState() => _HomeState();

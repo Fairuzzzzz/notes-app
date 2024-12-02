@@ -2,6 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseService {
+  String get userIdColumn => _userID;
   static Database? _db;
   static final DatabaseService instance = DatabaseService._contractor();
 

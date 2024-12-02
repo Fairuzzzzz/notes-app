@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:notesapp/pages/home.dart';
+import 'package:notesapp/pages/login_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       theme: ThemeData(fontFamily: 'Backwards'),
       debugShowCheckedModeBanner: false,
-      home: const Home(),
+      home: const LoginPage(),
     );
   }
 }
