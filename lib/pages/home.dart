@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:notesapp/services/database_services.dart';
 
 class Home extends StatefulWidget {
-  final int userId;
-  const Home({super.key, required this.userId});
+  const Home({super.key});
 
   @override
   State<Home> createState() => _HomeState();
 }
 
 class _HomeState extends State<Home> {
-  final DatabaseService _databaseService = DatabaseService.instance;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,6 +19,7 @@ class _HomeState extends State<Home> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   "Your Notes",
@@ -31,14 +28,11 @@ class _HomeState extends State<Home> {
                       fontSize: 46,
                       fontWeight: FontWeight.w300),
                 ),
-                const SizedBox(
-                  width: 110,
-                ),
                 Container(
                   height: 50,
                   width: 50,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  margin: const EdgeInsets.only(right: 24),
                   decoration: BoxDecoration(
                       border: Border.all(color: Colors.white),
                       borderRadius: BorderRadius.circular(12)),
@@ -50,7 +44,7 @@ class _HomeState extends State<Home> {
               ],
             ),
             const SizedBox(
-              height: 20,
+              height: 12,
             ),
             Container(
               height: 30,
@@ -94,44 +88,50 @@ class _HomeState extends State<Home> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Container(
-                  margin: const EdgeInsets.all(2),
-                  width: 22,
-                  height: 22,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+              Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Container(
+                      margin: const EdgeInsets.all(2),
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Welcome back User",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontFamily: 'Poppins'),
+                  ),
+                ],
               ),
-              const SizedBox(
-                width: 12,
+              Row(
+                children: [
+                  SvgPicture.asset(
+                    'assets/icons/Search.svg',
+                    height: 20,
+                    width: 20,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  SvgPicture.asset(
+                    'assets/icons/Bell.svg',
+                    height: 20,
+                    width: 20,
+                    color: Colors.white,
+                  ),
+                ],
               ),
-              const Text(
-                "Welcome back User",
-                style: TextStyle(
-                    color: Colors.white, fontSize: 14, fontFamily: 'Poppins'),
-              ),
-              const SizedBox(width: 122),
-              SvgPicture.asset(
-                'assets/icons/Search.svg',
-                height: 20,
-                width: 20,
-                color: Colors.white,
-              ),
-              const SizedBox(
-                width: 12,
-              ),
-              SvgPicture.asset(
-                'assets/icons/Bell.svg',
-                height: 20,
-                width: 20,
-                color: Colors.white,
-              )
             ],
           ),
         ],
