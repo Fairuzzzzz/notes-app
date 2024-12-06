@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:notesapp/pages/home.dart';
-import 'package:notesapp/pages/login_page.dart';
+import 'package:notesapp/auth/auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -21,7 +20,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       theme: ThemeData(fontFamily: 'Backwards'),
       debugShowCheckedModeBanner: false,
-      home: const LoginPage(),
+      home: const AuthGate(),
     );
   }
 }

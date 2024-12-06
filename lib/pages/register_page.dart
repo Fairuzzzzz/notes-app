@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:notesapp/auth/auth_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,11 +12,13 @@ class _RegisterPageState extends State<RegisterPage> {
   final authService = AuthService();
 
   // Text Controllers
+  final _usernameControllers = TextEditingController();
   final _emailControllers = TextEditingController();
   final _passwordControllers = TextEditingController();
   final _confirmPasswordControllers = TextEditingController();
 
   void signUp() async {
+    final username = _usernameControllers.text;
     final email = _emailControllers.text;
     final password = _passwordControllers.text;
     final confirmPassword = _confirmPasswordControllers.text;
@@ -29,8 +29,14 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Username is required!")));
+      return;
+    }
+
     try {
-      await authService.signUpWithEmailPassword(email, password);
+      await authService.signUpWithEmailPassword(email, password, username);
 
       Navigator.pop(context);
     } catch (e) {
@@ -59,6 +65,14 @@ class _RegisterPageState extends State<RegisterPage> {
       body: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 50),
           children: [
+            TextField(
+              controller: _usernameControllers,
+              decoration: const InputDecoration(
+                  labelText: 'Username',
+                  labelStyle: TextStyle(fontFamily: 'Poppins')),
+              style:
+                  const TextStyle(fontFamily: 'Poppins', color: Colors.white),
+            ),
             TextField(
               controller: _emailControllers,
               decoration: const InputDecoration(

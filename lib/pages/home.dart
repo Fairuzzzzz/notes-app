@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:notesapp/auth/auth_service.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -9,6 +10,12 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  final authService = AuthService();
+
+  void logout() async {
+    await authService.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,6 +137,18 @@ class _HomeState extends State<Home> {
                     width: 20,
                     color: Colors.white,
                   ),
+                  const SizedBox(
+                    width: 12,
+                  ),
+                  GestureDetector(
+                    onTap: logout,
+                    child: SvgPicture.asset(
+                      'assets/icons/Logout.svg',
+                      height: 20,
+                      width: 20,
+                      color: Colors.white,
+                    ),
+                  )
                 ],
               ),
             ],
