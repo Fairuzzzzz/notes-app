@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:notesapp/auth/auth_service.dart';
+import 'package:notesapp/pages/note_editor.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -10,8 +12,10 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  final SupabaseClient _supabase = Supabase.instance.client;
   final authService = AuthService();
   String username = '';
+  List<Map<String, dynamic>> notes = [];
 
   void logout() async {
     await authService.signOut();
@@ -21,6 +25,50 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     _loadUsername();
+    loadNotes();
+  }
+
+  Future<void> createNewNote() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final workspaceResponse = await _supabase
+          .from('workspaces')
+          .select('id')
+          .eq('workspace_name', 'Personal')
+          .eq('created_by', userId)
+          .single();
+
+      final workspaceId = workspaceResponse['id'];
+
+      final response = await _supabase.from('notes').insert({
+        'title': 'New Note',
+        'content': '',
+        'workspace_id': workspaceId,
+        'category': '',
+        'created_by': userId,
+        'updated_by': userId,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).select();
+
+      if (mounted && response.isNotEmpty) {
+        setState(() {
+          notes.add(response.first);
+        });
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) =>
+                    NoteEditor(noteId: response.first['id'])));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error creating note: $e')));
+      }
+    }
   }
 
   Future<void> _loadUsername() async {
@@ -29,6 +77,25 @@ class _HomeState extends State<Home> {
       setState(() {
         username = name ?? 'User';
       });
+    }
+  }
+
+  Future<void> loadNotes() async {
+    try {
+      final response = await _supabase
+          .from('notes')
+          .select()
+          .order('created_at', ascending: false);
+      if (mounted) {
+        setState(() {
+          notes = List<Map<String, dynamic>>.from(response);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error loading notes: $e')));
+      }
     }
   }
 
@@ -51,17 +118,20 @@ class _HomeState extends State<Home> {
                       fontSize: 46,
                       fontWeight: FontWeight.w300),
                 ),
-                Container(
-                  height: 50,
-                  width: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  margin: const EdgeInsets.only(right: 24),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: SvgPicture.asset(
-                    'assets/icons/Plus.svg',
-                    color: Colors.white,
+                GestureDetector(
+                  onTap: createNewNote,
+                  child: Container(
+                    height: 50,
+                    width: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    margin: const EdgeInsets.only(right: 24),
+                    decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white),
+                        borderRadius: BorderRadius.circular(12)),
+                    child: SvgPicture.asset(
+                      'assets/icons/Plus.svg',
+                      color: Colors.white,
+                    ),
                   ),
                 )
               ],
@@ -96,7 +166,47 @@ class _HomeState extends State<Home> {
                   )
                 ],
               ),
-            )
+            ),
+            const SizedBox(
+              height: 24,
+            ),
+            Expanded(
+                child: ListView.builder(
+              itemCount: notes.length,
+              itemBuilder: (context, index) {
+                final note = notes[index];
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                NoteEditor(noteId: note['id'])));
+                  },
+                  child: Container(
+                    height: 60,
+                    width: 120,
+                    margin: const EdgeInsets.only(bottom: 8, right: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white),
+                    child: Row(
+                      children: [
+                        Text(
+                          note['title'] ?? 'New Note',
+                          style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500),
+                        )
+                      ],
+                    ),
+                  ),
+                );
+              },
+            )),
           ],
         ),
       ),

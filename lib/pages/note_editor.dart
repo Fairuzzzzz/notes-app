@@ -10,6 +10,7 @@ class NoteEditor extends StatefulWidget {
 }
 
 class _NoteEditorState extends State<NoteEditor> {
+  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
 
   @override
@@ -27,6 +28,7 @@ class _NoteEditorState extends State<NoteEditor> {
           .single();
       if (mounted) {
         setState(() {
+          _titleController.text = response['title'] ?? '';
           _contentController.text = response['content'] ?? '';
         });
       }
@@ -40,9 +42,11 @@ class _NoteEditorState extends State<NoteEditor> {
 
   Future<void> _saveNote() async {
     try {
-      await Supabase.instance.client
-          .from('notes')
-          .update({'content': _contentController.text}).eq('id', widget.noteId);
+      await Supabase.instance.client.from('notes').update({
+        'title': _titleController,
+        'content': _contentController.text,
+        'updated_at': DateTime.now().toIso8601String()
+      }).eq('id', widget.noteId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -60,20 +64,45 @@ class _NoteEditorState extends State<NoteEditor> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Edit note',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontFamily: 'Poppins'),
         ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: TextField(
-          controller: _contentController,
-          style: const TextStyle(color: Colors.white),
-          maxLines: null,
-          decoration: const InputDecoration(
-              border: InputBorder.none,
-              hintText: 'Start Writing...',
-              hintStyle: TextStyle(color: Colors.white)),
-          onChanged: (_) => _saveNote,
+        child: Column(
+          children: [
+            TextField(
+              controller: _titleController,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w500),
+              decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Title',
+                  hintStyle: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                      fontSize: 24)),
+              onChanged: (_) => _saveNote,
+            ),
+            const Divider(color: Colors.white),
+            const SizedBox(height: 12),
+            Expanded(
+              child: TextField(
+                controller: _contentController,
+                style:
+                    const TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+                maxLines: null,
+                decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: 'Start Writing...',
+                    hintStyle: TextStyle(color: Colors.white)),
+                onChanged: (_) => _saveNote,
+              ),
+            ),
+          ],
         ),
       ),
     );
