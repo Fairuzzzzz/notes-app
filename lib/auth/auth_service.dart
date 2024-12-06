@@ -6,8 +6,13 @@ class AuthService {
   // Sign in with email and password
   Future<AuthResponse> signInWithEmailPassword(
       String email, String password) async {
-    return await _supabase.auth
-        .signInWithPassword(email: email, password: password);
+    try {
+      final AuthResponse response = await _supabase.auth
+          .signInWithPassword(email: email, password: password);
+      return response;
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // Sign up with email and password
@@ -23,6 +28,12 @@ class AuthService {
         'email': email,
         'created_at': DateTime.now().toIso8601String()
       });
+
+      await _supabase.from('workspaces').insert({
+        'workspace_name': 'Personal',
+        'created_by': res.user!.id,
+        'updated_by': res.user!.id
+      });
     }
     return res;
   }
@@ -37,5 +48,22 @@ class AuthService {
     final session = _supabase.auth.currentSession;
     final user = session?.user;
     return user?.email;
+  }
+
+  Future<String?> getCurrentUsername() async {
+    try {
+      final String? userId = _supabase.auth.currentUser?.id;
+
+      if (userId == null) return null;
+
+      final data = await _supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', userId)
+          .single();
+      return data['username'] as String;
+    } catch (e) {
+      return null;
+    }
   }
 }

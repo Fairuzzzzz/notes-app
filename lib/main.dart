@@ -4,6 +4,8 @@ import 'package:notesapp/auth/auth_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   await dotenv.load(fileName: ".env");
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL']!,

@@ -11,9 +11,25 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   final authService = AuthService();
+  String username = '';
 
   void logout() async {
     await authService.signOut();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsername();
+  }
+
+  Future<void> _loadUsername() async {
+    final name = await authService.getCurrentUsername();
+    if (mounted) {
+      setState(() {
+        username = name ?? 'User';
+      });
+    }
   }
 
   @override
@@ -113,9 +129,9 @@ class _HomeState extends State<Home> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    "Welcome back User",
-                    style: TextStyle(
+                  Text(
+                    "Welcome back $username",
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontFamily: 'Poppins'),
