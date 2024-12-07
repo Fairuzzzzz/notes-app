@@ -176,17 +176,20 @@ class _HomeState extends State<Home> {
               itemBuilder: (context, index) {
                 final note = notes[index];
                 return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                             builder: (context) =>
                                 NoteEditor(noteId: note['id'])));
+                    if (result == true || result == 'updated') {
+                      loadNotes();
+                    }
                   },
                   child: Container(
                     height: 60,
                     width: 120,
-                    margin: const EdgeInsets.only(bottom: 8, right: 24),
+                    margin: const EdgeInsets.only(bottom: 18, right: 24),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
@@ -200,7 +203,7 @@ class _HomeState extends State<Home> {
                               fontSize: 14,
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.w500),
-                        )
+                        ),
                       ],
                     ),
                   ),
