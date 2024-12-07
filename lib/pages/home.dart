@@ -5,7 +5,8 @@ import 'package:notesapp/pages/note_editor.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Home extends StatefulWidget {
-  const Home({super.key});
+  final String userId;
+  const Home({required this.userId, super.key});
 
   @override
   State<Home> createState() => _HomeState();
@@ -16,6 +17,9 @@ class _HomeState extends State<Home> {
   final authService = AuthService();
   String username = '';
   List<Map<String, dynamic>> notes = [];
+  final TextEditingController _serachController = TextEditingController();
+  List<Map<String, dynamic>> filteredNotes = [];
+  bool isSearching = false;
 
   void logout() async {
     await authService.signOut();
@@ -26,6 +30,16 @@ class _HomeState extends State<Home> {
     super.initState();
     _loadUsername();
     loadNotes();
+    filteredNotes = notes;
+    _serachController.addListener(() {
+      filterNotes(_serachController.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _serachController.dispose();
+    super.dispose();
   }
 
   Future<void> createNewNote() async {
@@ -83,11 +97,19 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> _loadUsername() async {
-    final name = await authService.getCurrentUsername();
-    if (mounted) {
-      setState(() {
-        username = name ?? 'User';
-      });
+    try {
+      final name = await authService.getCurrentUsername();
+      if (mounted) {
+        setState(() {
+          username = name!;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          username = 'User';
+        });
+      }
     }
   }
 
@@ -100,6 +122,7 @@ class _HomeState extends State<Home> {
       if (mounted) {
         setState(() {
           notes = List<Map<String, dynamic>>.from(response);
+          filteredNotes = notes;
         });
       }
     } catch (e) {
@@ -110,15 +133,68 @@ class _HomeState extends State<Home> {
     }
   }
 
+  void filterNotes(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        filteredNotes = notes;
+        isSearching = false;
+      });
+    } else {
+      setState(() {
+        filteredNotes = notes
+            .where((note) => note['title']
+                .toString()
+                .toLowerCase()
+                .contains(query.toLowerCase()))
+            .toList();
+        isSearching = true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: appBar(),
       body: Padding(
-        padding: const EdgeInsets.only(left: 24, top: 22),
+        padding: const EdgeInsets.only(left: 24, top: 10, right: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            AnimatedOpacity(
+                opacity: isSearching ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: SizedBox(
+                  height: isSearching ? 40 : 0,
+                  child: isSearching
+                      ? TextField(
+                          controller: _serachController,
+                          style: const TextStyle(
+                              color: Colors.white, fontFamily: 'Poppins'),
+                          decoration: InputDecoration(
+                              hintText: 'Search notes...',
+                              hintStyle: const TextStyle(
+                                  color: Colors.white54, fontFamily: 'Poppins'),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      const BorderSide(color: Colors.white)),
+                              enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      const BorderSide(color: Colors.white)),
+                              focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      const BorderSide(color: Colors.white)),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 12)),
+                        )
+                      : null,
+                )),
+            const SizedBox(
+              height: 12,
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -135,7 +211,6 @@ class _HomeState extends State<Home> {
                     height: 50,
                     width: 50,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    margin: const EdgeInsets.only(right: 24),
                     decoration: BoxDecoration(
                         border: Border.all(color: Colors.white),
                         borderRadius: BorderRadius.circular(12)),
@@ -183,9 +258,9 @@ class _HomeState extends State<Home> {
             ),
             Expanded(
                 child: ListView.builder(
-              itemCount: notes.length,
+              itemCount: filteredNotes.length,
               itemBuilder: (context, index) {
-                final note = notes[index];
+                final note = filteredNotes[index];
                 return GestureDetector(
                   onTap: () async {
                     final result = await Navigator.push(
@@ -202,7 +277,7 @@ class _HomeState extends State<Home> {
                   child: Container(
                     height: 60,
                     width: 120,
-                    margin: const EdgeInsets.only(bottom: 18, right: 24),
+                    margin: const EdgeInsets.only(bottom: 18),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
@@ -266,11 +341,22 @@ class _HomeState extends State<Home> {
               ),
               Row(
                 children: [
-                  SvgPicture.asset(
-                    'assets/icons/Search.svg',
-                    height: 20,
-                    width: 20,
-                    color: Colors.white,
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        isSearching = !isSearching;
+                        if (!isSearching) {
+                          _serachController.clear();
+                          filteredNotes = notes;
+                        }
+                      });
+                    },
+                    child: SvgPicture.asset(
+                      'assets/icons/Search.svg',
+                      height: 20,
+                      width: 20,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   SvgPicture.asset(

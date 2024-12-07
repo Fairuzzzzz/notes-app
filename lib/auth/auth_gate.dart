@@ -20,10 +20,11 @@ class AuthGate extends StatelessWidget {
             );
           }
 
-          // Check if there is a valdi current session
+          // Check if there is a valid current session
           final session = snapshot.hasData ? snapshot.data!.session : null;
           if (session != null) {
-            return const Home();
+            final userId = session.user.id;
+            return Home(userId: userId);
           } else {
             return const LoginPage();
           }
