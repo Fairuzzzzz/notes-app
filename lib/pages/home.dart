@@ -33,14 +33,25 @@ class _HomeState extends State<Home> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      final workspaceResponse = await _supabase
-          .from('workspaces')
-          .select('id')
-          .eq('workspace_name', 'Personal')
-          .eq('created_by', userId)
-          .single();
+      String workspaceId;
 
-      final workspaceId = workspaceResponse['id'];
+      try {
+        final workspaceResponse = await _supabase
+            .from('workspaces')
+            .select('id')
+            .eq('workspace_name', 'Personal')
+            .eq('created_by', userId)
+            .single();
+
+        workspaceId = workspaceResponse['id'];
+      } catch (e) {
+        final newWorkspace = await _supabase.from('workspaces').insert({
+          'workspace_name': 'Personal',
+          'created_by': userId,
+          'updated_by': userId
+        }).select();
+        workspaceId = newWorkspace[0]['id'];
+      }
 
       final response = await _supabase.from('notes').insert({
         'title': 'New Note',
@@ -182,7 +193,9 @@ class _HomeState extends State<Home> {
                         MaterialPageRoute(
                             builder: (context) =>
                                 NoteEditor(noteId: note['id'])));
-                    if (result == true || result == 'updated') {
+                    if (result == true ||
+                        result == 'updated' ||
+                        result == 'created') {
                       loadNotes();
                     }
                   },
