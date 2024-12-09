@@ -117,15 +117,19 @@ class _HomeState extends State<Home> {
         setState(() {
           notes.add(response.first);
         });
+
+        final BuildContext currentContext = this.context;
+
         Navigator.push(
-            context as BuildContext,
+            currentContext,
             MaterialPageRoute(
                 builder: (context) =>
                     NoteEditor(noteId: response.first['id'])));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context as BuildContext)
+        final BuildContext currentContext = this.context;
+        ScaffoldMessenger.of(currentContext)
             .showSnackBar(SnackBar(content: Text('Error creating note: $e')));
       }
     }
@@ -220,12 +224,22 @@ class _HomeState extends State<Home> {
   Future<void> loadWorkspaces() async {
     try {
       final userId = _supabase.auth.currentUser?.id;
-      final response =
-          await _supabase.from('workspaces').select().eq('created_by', userId!);
+      final response = await _supabase
+          .from('workspaces')
+          .select()
+          .eq('created_by', userId!)
+          .isFilter('deleted_at', null)
+          .order('created_at', ascending: false);
 
       if (mounted) {
         setState(() {
-          workspaces = List<Map<String, dynamic>>.from(response);
+          final uniqueWorkspaces = <String, Map<String, dynamic>>{};
+          for (var workspace in response) {
+            if (!uniqueWorkspaces.containsKey(workspace['workspace_name'])) {
+              uniqueWorkspaces[workspace['workspace_name']] = workspace;
+            }
+          }
+          workspaces = uniqueWorkspaces.values.toList();
         });
       }
     } catch (e) {
@@ -241,7 +255,16 @@ class _HomeState extends State<Home> {
       final workspace =
           workspaces.firstWhere((w) => w['workspace_name'] == workspaceName);
 
-      await _supabase.from('workspaces').delete().eq('id', workspace['id']);
+      final workspaceId = workspace['id'];
+      final now = DateTime.now().toIso8601String();
+
+      await _supabase
+          .from('notes')
+          .update({'deleted_at': now}).eq('workspace_id', workspaceId);
+
+      await _supabase
+          .from('workspaces')
+          .update({'deleted_at': now}).eq('id', workspaceId);
 
       if (mounted) {
         setState(() {
