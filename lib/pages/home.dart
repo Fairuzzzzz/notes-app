@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:notesapp/auth/auth_service.dart';
 import 'package:notesapp/pages/note_editor.dart';
+import 'package:path/path.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Home extends StatefulWidget {
@@ -20,6 +21,9 @@ class _HomeState extends State<Home> {
   final TextEditingController _serachController = TextEditingController();
   List<Map<String, dynamic>> filteredNotes = [];
   bool isSearching = false;
+  bool isLoading = true;
+  String selectedWorkspace = 'Personal';
+  List<Map<String, dynamic>> workspaces = [];
 
   void logout() async {
     await authService.signOut();
@@ -28,9 +32,6 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    _loadUsername();
-    loadNotes();
-    filteredNotes = notes;
     _serachController.addListener(() {
       filterNotes(_serachController.text);
     });
@@ -42,10 +43,44 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await _loadUsername();
+      await loadWorkspaces();
+      await loadNotes();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context as BuildContext)
+            .showSnackBar(SnackBar(content: Text('Error initializing: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> createNewNote() async {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
+
+      final workspace = workspaces
+          .firstWhere((w) => w['workspace_name'] == selectedWorkspace);
 
       String workspaceId;
 
@@ -70,7 +105,7 @@ class _HomeState extends State<Home> {
       final response = await _supabase.from('notes').insert({
         'title': 'New Note',
         'content': '',
-        'workspace_id': workspaceId,
+        'workspace_id': workspace['id'],
         'category': '',
         'created_by': userId,
         'updated_by': userId,
@@ -83,14 +118,14 @@ class _HomeState extends State<Home> {
           notes.add(response.first);
         });
         Navigator.push(
-            context,
+            context as BuildContext,
             MaterialPageRoute(
                 builder: (context) =>
                     NoteEditor(noteId: response.first['id'])));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
+        ScaffoldMessenger.of(context as BuildContext)
             .showSnackBar(SnackBar(content: Text('Error creating note: $e')));
       }
     }
@@ -115,9 +150,17 @@ class _HomeState extends State<Home> {
 
   Future<void> loadNotes() async {
     try {
+      if (workspaces.isEmpty) return;
+
+      final workspace = workspaces.firstWhere(
+        (w) => w['workspace_name'] == selectedWorkspace,
+        orElse: () => workspaces.first,
+      );
+
       final response = await _supabase
           .from('notes')
           .select()
+          .eq('workspace_id', workspace['id'])
           .order('created_at', ascending: false);
       if (mounted) {
         setState(() {
@@ -127,7 +170,7 @@ class _HomeState extends State<Home> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
+        ScaffoldMessenger.of(context as BuildContext)
             .showSnackBar(SnackBar(content: Text('Error loading notes: $e')));
       }
     }
@@ -152,155 +195,377 @@ class _HomeState extends State<Home> {
     }
   }
 
+  Future<void> createWorkspaces(String name) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      final response = await _supabase.from('workspaces').insert({
+        'workspace_name': name,
+        'created_by': userId,
+        'updated_by': userId
+      }).select();
+
+      if (mounted) {
+        setState(() {
+          workspaces.add(response.first);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+            SnackBar(content: Text('Error create workspaces: $e')));
+      }
+    }
+  }
+
+  Future<void> loadWorkspaces() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      final response =
+          await _supabase.from('workspaces').select().eq('created_by', userId!);
+
+      if (mounted) {
+        setState(() {
+          workspaces = List<Map<String, dynamic>>.from(response);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context as BuildContext)
+            .showSnackBar(SnackBar(content: Text('Error load workspaces: $e')));
+      }
+    }
+  }
+
+  Future<void> deleteWorkspace(String workspaceName) async {
+    try {
+      final workspace =
+          workspaces.firstWhere((w) => w['workspace_name'] == workspaceName);
+
+      await _supabase.from('workspaces').delete().eq('id', workspace['id']);
+
+      if (mounted) {
+        setState(() {
+          workspaces.removeWhere((w) => w['workspace_name'] == workspaceName);
+          selectedWorkspace = 'Personal';
+        });
+        await loadNotes();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+            SnackBar(content: Text('Error deleting workspaces: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: appBar(),
-      body: Padding(
-        padding: const EdgeInsets.only(left: 24, top: 10, right: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedOpacity(
-                opacity: isSearching ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: SizedBox(
-                  height: isSearching ? 40 : 0,
-                  child: isSearching
-                      ? TextField(
-                          controller: _serachController,
-                          style: const TextStyle(
-                              color: Colors.white, fontFamily: 'Poppins'),
-                          decoration: InputDecoration(
-                              hintText: 'Search notes...',
-                              hintStyle: const TextStyle(
-                                  color: Colors.white54, fontFamily: 'Poppins'),
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: Colors.white)),
-                              enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: Colors.white)),
-                              focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: Colors.white)),
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 12)),
-                        )
-                      : null,
-                )),
-            const SizedBox(
-              height: 12,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Your Notes",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 46,
-                      fontWeight: FontWeight.w300),
-                ),
-                GestureDetector(
-                  onTap: createNewNote,
-                  child: Container(
-                    height: 50,
-                    width: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white),
-                        borderRadius: BorderRadius.circular(12)),
-                    child: SvgPicture.asset(
-                      'assets/icons/Plus.svg',
-                      color: Colors.white,
-                    ),
-                  ),
-                )
-              ],
-            ),
-            const SizedBox(
-              height: 12,
-            ),
-            Container(
-              height: 30,
-              width: 120,
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6), color: Colors.white),
-              child: Row(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.only(left: 24, top: 10, right: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Personal",
-                    style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 14,
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w500),
+                  AnimatedOpacity(
+                      opacity: isSearching ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: SizedBox(
+                        height: isSearching ? 40 : 0,
+                        child: isSearching
+                            ? TextField(
+                                controller: _serachController,
+                                style: const TextStyle(
+                                    color: Colors.white, fontFamily: 'Poppins'),
+                                decoration: InputDecoration(
+                                    hintText: 'Search notes...',
+                                    hintStyle: const TextStyle(
+                                        color: Colors.white54,
+                                        fontFamily: 'Poppins'),
+                                    border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(
+                                            color: Colors.white)),
+                                    enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(
+                                            color: Colors.white)),
+                                    focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(
+                                            color: Colors.white)),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12)),
+                              )
+                            : null,
+                      )),
+                  const SizedBox(
+                    height: 12,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Your Notes",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 46,
+                            fontWeight: FontWeight.w300),
+                      ),
+                      GestureDetector(
+                        onTap: createNewNote,
+                        child: Container(
+                          height: 50,
+                          width: 50,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                              border: Border.all(color: Colors.white),
+                              borderRadius: BorderRadius.circular(12)),
+                          child: SvgPicture.asset(
+                            'assets/icons/Plus.svg',
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    ],
                   ),
                   const SizedBox(
-                    width: 14,
+                    height: 12,
                   ),
-                  SvgPicture.asset(
-                    'assets/icons/ChevronDown.svg',
-                    height: 18,
-                    width: 18,
-                  )
-                ],
-              ),
-            ),
-            const SizedBox(
-              height: 24,
-            ),
-            Expanded(
-                child: ListView.builder(
-              itemCount: filteredNotes.length,
-              itemBuilder: (context, index) {
-                final note = filteredNotes[index];
-                return GestureDetector(
-                  onTap: () async {
-                    final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                NoteEditor(noteId: note['id'])));
-                    if (result == true ||
-                        result == 'updated' ||
-                        result == 'created') {
-                      loadNotes();
-                    }
-                  },
-                  child: Container(
-                    height: 60,
-                    width: 120,
-                    margin: const EdgeInsets.only(bottom: 18),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white),
-                    child: Row(
-                      children: [
-                        Text(
-                          note['title'] ?? 'New Note',
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        height: 35,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                          borderRadius: BorderRadius.circular(12),
+                          value: selectedWorkspace,
+                          icon: SvgPicture.asset(
+                            'assets/icons/ChevronDown.svg',
+                            height: 18,
+                            width: 18,
+                          ),
                           style: const TextStyle(
                               color: Colors.black,
                               fontSize: 14,
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
+                          items: [
+                            ...workspaces.map((workspace) => DropdownMenuItem(
+                                value: workspace['workspace_name'],
+                                child: SizedBox(
+                                  width: 140,
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                          child: Text(
+                                        workspace['workspace_name'],
+                                        style: const TextStyle(
+                                            color: Colors.black,
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w500),
+                                      )),
+                                      if (workspace['workspace_name'] !=
+                                          'Personal')
+                                        GestureDetector(
+                                          onTap: () async {
+                                            final shouldDelte =
+                                                await showDialog<bool>(
+                                                    context: context,
+                                                    builder:
+                                                        (context) =>
+                                                            AlertDialog(
+                                                              title: const Text(
+                                                                'Delete Workspace?',
+                                                                style: TextStyle(
+                                                                    fontFamily:
+                                                                        'Poppins'),
+                                                              ),
+                                                              content: Text(
+                                                                'Delete ${workspace['workspace_name']}?',
+                                                                style: const TextStyle(
+                                                                    fontFamily:
+                                                                        'Poppins'),
+                                                              ),
+                                                              actions: [
+                                                                TextButton(
+                                                                    onPressed: () =>
+                                                                        Navigator.pop(
+                                                                            context,
+                                                                            false),
+                                                                    child:
+                                                                        const Text(
+                                                                      'Cancle',
+                                                                      style: TextStyle(
+                                                                          fontFamily:
+                                                                              'Poppins',
+                                                                          color:
+                                                                              Colors.black),
+                                                                    )),
+                                                                TextButton(
+                                                                    onPressed: () =>
+                                                                        Navigator.pop(
+                                                                            context,
+                                                                            true),
+                                                                    child:
+                                                                        const Text(
+                                                                      'Delete',
+                                                                      style: TextStyle(
+                                                                          fontFamily:
+                                                                              'Poppins',
+                                                                          color:
+                                                                              Colors.red),
+                                                                    ))
+                                                              ],
+                                                            ));
+                                            if (shouldDelte == true) {
+                                              await deleteWorkspace(
+                                                  workspace['workspace_name']);
+                                            }
+                                          },
+                                          child: const Icon(
+                                            Icons.delete_outline,
+                                            size: 18,
+                                            color: Colors.red,
+                                          ),
+                                        )
+                                    ],
+                                  ),
+                                ))),
+                            const DropdownMenuItem(
+                                value: 'add_new',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.add, size: 16),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Add Workspace',
+                                      style: TextStyle(
+                                          color: Colors.black,
+                                          fontFamily: 'Poppins',
+                                          fontSize: 14),
+                                    )
+                                  ],
+                                ))
+                          ],
+                          onChanged: (value) async {
+                            if (value == 'add_new') {
+                              final controller = TextEditingController();
+                              final name = await showDialog<String>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                        title: const Text(
+                                          'Create Workspace',
+                                          style:
+                                              TextStyle(fontFamily: 'Poppins'),
+                                        ),
+                                        content: TextField(
+                                          controller: controller,
+                                          decoration: const InputDecoration(
+                                              hintText: 'Workspace name',
+                                              hintStyle: TextStyle(
+                                                  fontFamily: 'Poppins')),
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins'),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context, null),
+                                              child: const Text(
+                                                'Cancel',
+                                                style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontFamily: 'Poppins'),
+                                              )),
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(
+                                                  context, controller.text),
+                                              child: const Text(
+                                                'Create',
+                                                style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontFamily: 'Poppins'),
+                                              ))
+                                        ],
+                                      ));
+                              if (name != null && name.isNotEmpty) {
+                                await createWorkspaces(name);
+                                setState(() {
+                                  selectedWorkspace = name;
+                                });
+                                await loadNotes();
+                              } else {
+                                return;
+                              }
+                            } else if (value != null) {
+                              setState(() {
+                                selectedWorkspace = value;
+                              });
+                              await loadNotes();
+                            }
+                          },
+                        )),
+                      )
+                    ],
                   ),
-                );
-              },
-            )),
-          ],
-        ),
-      ),
+                  const SizedBox(
+                    height: 24,
+                  ),
+                  Expanded(
+                      child: ListView.builder(
+                    itemCount: filteredNotes.length,
+                    itemBuilder: (context, index) {
+                      final note = filteredNotes[index];
+                      return GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      NoteEditor(noteId: note['id'])));
+                          if (result == true ||
+                              result == 'updated' ||
+                              result == 'created') {
+                            loadNotes();
+                          }
+                        },
+                        child: Container(
+                          height: 60,
+                          width: 120,
+                          margin: const EdgeInsets.only(bottom: 18),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white),
+                          child: Row(
+                            children: [
+                              Text(
+                                note['title'] ?? 'New Note',
+                                style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 14,
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  )),
+                ],
+              ),
+            ),
       backgroundColor: Colors.black,
     );
   }
@@ -314,31 +579,18 @@ class _HomeState extends State<Home> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: Container(
-                      margin: const EdgeInsets.all(2),
-                      width: 22,
-                      height: 22,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
+              Row(children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
                     "Welcome back $username",
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontFamily: 'Poppins'),
                   ),
-                ],
-              ),
+                )
+              ]),
               Row(
                 children: [
                   GestureDetector(
