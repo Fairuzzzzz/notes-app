@@ -633,13 +633,6 @@ class _HomeState extends State<Home> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  SvgPicture.asset(
-                    'assets/icons/Bell.svg',
-                    height: 20,
-                    width: 20,
-                    color: Colors.white,
-                  ),
                   const SizedBox(
                     width: 12,
                   ),
